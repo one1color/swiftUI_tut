@@ -154,5 +154,18 @@
             "latitude": 44.747408
         },
         "imageName": "umbagog"
+    },
+    {
+        "name": "Turtle Rock",
+        "category": "Featured",
+        "city": "Twentynine Palms",
+        "state": "California",
+        "id": 1001,
+        "park": "Joshua Tree National Park",
+        "coordinates": {
+            "longitude": -116.166868,
+            "latitude": 34.011286
+        },
+        "imageName": "turtlerock"
     }
 ]
