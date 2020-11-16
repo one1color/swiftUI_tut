@@ -8,13 +8,14 @@
 import SwiftUI
 import RealityKit
 import ARKit
+import FocusEntity
 
 struct ContentView : View {
     @State private var isPlacementEnabled = false
-    @State private var selectedModel: String?
-    @State private var modelConfirmedForPlacement: String?
+    @State private var selectedModel: Model?
+    @State private var modelConfirmedForPlacement: Model?
         
-    private var models: [String] = {
+    private var models: [Model] = {
         //dynamic get our model file
         let filemanager = FileManager.default
         
@@ -23,10 +24,12 @@ struct ContentView : View {
             return[]
         }
         
-        var availableModels: [String] = []
+        var availableModels: [Model] = []
         for filename in files where filename.hasSuffix("usdz") {
             let modelName = filename.replacingOccurrences(of: ".usdz", with: "")
-            availableModels.append(modelName)
+            let model = Model(modelName: modelName)
+            
+            availableModels.append(model)
         }
         return availableModels
     }()
@@ -53,11 +56,56 @@ struct ContentView : View {
 }
 
 struct ARViewContainer: UIViewRepresentable {
-    @Binding var modelConfirmedForPlacement: String?
+    @Binding var modelConfirmedForPlacement: Model?
     
     func makeUIView(context: Context) -> ARView {
         
-        let arView = ARView(frame: .zero)
+        let arView = CustomARView(frame: .zero)//ARView(frame: .zero)
+        
+        return arView
+        
+    }
+    
+    func updateUIView(_ uiView: ARView, context: Context) {
+        if let model = self.modelConfirmedForPlacement {
+            
+            if let modelEntity = model.modelEntity{
+                print("DEBUG: adding model to scene \(model.modelName)")
+                
+                let anchorEntity = AnchorEntity(plane: .any)
+                anchorEntity.addChild(modelEntity)
+                
+                uiView.scene.addAnchor(anchorEntity)
+            }else{
+                print("DEBUG: Uncable to load model to schene: \(model.modelName)")
+            }
+            
+            
+            
+            DispatchQueue.main.async {
+                self.modelConfirmedForPlacement = nil
+            }
+        }
+    }
+}
+
+class CustomARView: ARView {
+    let focusSquare = FESquare()
+    
+    required init(frame frameRect: CGRect) {
+        super.init(frame: frameRect)
+        
+        focusSquare.viewDelegate = self
+        focusSquare.delegate = self
+        focusSquare.setAutoUpdate(to: true)
+        
+        self.setupARView()
+    }
+    @objc required dynamic init?(coder decoder: NSCoder) {
+        fatalError("init(coder:) hanst been implemented")
+    }
+    
+    func setupARView() {
         let config = ARWorldTrackingConfiguration()
         config.planeDetection = [.horizontal, .vertical]
         config.environmentTexturing = .automatic
@@ -66,42 +114,37 @@ struct ARViewContainer: UIViewRepresentable {
             config.sceneReconstruction = .mesh
         }
         
-        arView.session.run(config)
-        
-        return arView
+        self.session.run(config)
         
     }
-    
-    func updateUIView(_ uiView: ARView, context: Context) {
-        if let modelName = self.modelConfirmedForPlacement {
-            print("DEBUG: adding model to scene - \(modelName)")
-            
-            
-            DispatchQueue.main.async {
-                self.modelConfirmedForPlacement = nil
-            }
-        }
+}
+
+extension CustomARView: FEDelegate {
+    func toTrackingState() {
+        print("tracking")
     }
-    
+    func toInitializingState(){
+        print("initializing")
+    }
 }
 
 struct ModelPickerView: View {
     @Binding var isPlacementEnabled: Bool
-    @Binding var selectedModel: String?
+    @Binding var selectedModel: Model?
     
-    var models:[String]
+    var models:[Model]
     
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 20){
                 ForEach(0 ..< self.models.count){ index in
                     Button(action: {
-                        print("DEBUG: selected model with name: \(self.models[index])")
+                        print("DEBUG: selected model with name: \(self.models[index].modelName)")
                         
                         self.selectedModel = self.models[index]
                         self.isPlacementEnabled = true
                     }) {
-                        Image(uiImage: UIImage(named: self.models[index])!)
+                        Image(uiImage: self.models[index].image)
                             .resizable()
                             .frame(height: 80)
                             .aspectRatio(1/1, contentMode: .fit)
@@ -118,8 +161,8 @@ struct ModelPickerView: View {
 
 struct PlacementButtonView: View{
     @Binding var isPlacementEnabled: Bool
-    @Binding var selectedModel: String?
-    @Binding var modelConfirmedForPlacement: String?
+    @Binding var selectedModel: Model?
+    @Binding var modelConfirmedForPlacement: Model?
 
     
     var body: some View{
